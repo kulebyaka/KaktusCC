@@ -31,7 +31,7 @@ class Config:
             ]
         )
         
-        # Reduce verbosity of third-party libraries
+        # Reduce the verbosity of third-party libraries
         logging.getLogger('httpx').setLevel(logging.WARNING)
         logging.getLogger('telegram.ext.updater').setLevel(logging.WARNING)
         logging.getLogger('telegram.ext.Application').setLevel(logging.WARNING)
