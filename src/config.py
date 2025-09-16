@@ -30,3 +30,10 @@ class Config:
                 logging.StreamHandler()
             ]
         )
+        
+        # Reduce verbosity of third-party libraries
+        logging.getLogger('httpx').setLevel(logging.WARNING)
+        logging.getLogger('telegram.ext.updater').setLevel(logging.WARNING)
+        logging.getLogger('telegram.ext.Application').setLevel(logging.WARNING)
+        logging.getLogger('urllib3').setLevel(logging.WARNING)
+        logging.getLogger('asyncio').setLevel(logging.WARNING)
