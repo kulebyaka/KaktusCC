@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>T-Mobile Kaktus - Test Server</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #e91e63, #9c27b0);
+            color: white;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 30px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .event-card {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 25px;
+            border-radius: 10px;
+            margin: 20px 0;
+            border-left: 5px solid #fff;
+        }
+        .event-title {
+            font-size: 1.8rem;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #ffeb3b;
+        }
+        .event-description {
+            font-size: 1.2rem;
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+        .bonus-highlight {
+            background: rgba(255, 235, 59, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.1rem;
+            border: 2px dashed #ffeb3b;
+            margin: 15px 0;
+        }
+        .admin-link {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #333;
+            color: white;
+            padding: 10px 15px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 0.9rem;
+        }
+        .admin-link:hover {
+            background: #555;
+        }
+        .no-event {
+            text-align: center;
+            font-size: 1.5rem;
+            color: #ccc;
+            font-style: italic;
+        }
+        .footer-info {
+            margin-top: 40px;
+            text-align: center;
+            font-size: 0.9rem;
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <a href="/admin" class="admin-link">🛠 Admin Panel</a>
+    
+    <div class="container">
+        <h1>🌵 T-Mobile Kaktus</h1>
+        <h2 style="text-align: center; margin-bottom: 30px;">Chceš přidat kredit?</h2>
+        
+        {% if event.active %}
+        <div class="event-card">
+            <div class="event-title">{{ event.title }}</div>
+            <div class="event-description">{{ event.description }}</div>
+            
+            {% if event.bonus_text %}
+            <div class="bonus-highlight">
+                💰 {{ event.bonus_text }}
+            </div>
+            {% endif %}
+            
+            <div style="margin-top: 20px; font-size: 0.9rem; opacity: 0.8;">
+                ⏰ Akce je aktivní - nenech si ji ujít!
+            </div>
+        </div>
+        {% else %}
+        <div class="no-event">
+            Momentálně není dostupná žádná speciální akce.
+        </div>
+        {% endif %}
+        
+        <div class="footer-info">
+            <p>🧪 <strong>Test Server</strong> - Pro testování Kaktus bot notifikací</p>
+            <p>Změň obsah na <a href="/admin" style="color: #ffeb3b;">/admin</a> a sleduj reakci bota</p>
+        </div>
+    </div>
+</body>
+</html>
