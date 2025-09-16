@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  bot:
+    image: ghcr.io/${GITHUB_REPOSITORY:-kulebyaka/kaktuscc}:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql://bot:${POSTGRES_PASSWORD:-password}@db:5432/${POSTGRES_DB:-telegram_bot}
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - SCRAPE_URL=${SCRAPE_URL:-https://www.mujkaktus.cz/chces-pridat}
+      - CHECK_INTERVAL=${CHECK_INTERVAL:-300}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - TZ=${TZ:-Europe/Prague}
+    volumes:
+      - ./logs:/app/logs
+    networks:
+      - kaktus-network
+
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-telegram_bot}
+      POSTGRES_USER: ${POSTGRES_USER:-bot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kaktus-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-bot} -d ${POSTGRES_DB:-telegram_bot}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+
+networks:
+  kaktus-network:
+    driver: bridge

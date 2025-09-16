@@ -13,7 +13,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src/ ./src/
 COPY wait-for-db.py ./
 COPY entrypoint.sh ./
-COPY .env ./
 
 RUN mkdir -p logs
 RUN chmod +x entrypoint.sh
