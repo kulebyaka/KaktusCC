@@ -50,6 +50,9 @@ ENV/
 ehthumbs.db
 Thumbs.db
 
+# LLM
+/.claude
+
 # Logs
 logs/
 *.log
