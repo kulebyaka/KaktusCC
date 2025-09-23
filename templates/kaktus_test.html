@@ -81,38 +81,189 @@
         }
     </style>
 </head>
-<body>
-    <a href="/admin" class="admin-link">🛠 Admin Panel</a>
-    
-    <div class="container">
-        <h1>🌵 T-Mobile Kaktus</h1>
-        <h2 style="text-align: center; margin-bottom: 30px;">Chceš přidat kredit?</h2>
-        
-        {% if event.active %}
-        <div class="event-card">
-            <div class="event-title">{{ event.title }}</div>
-            <div class="event-description">{{ event.description }}</div>
-            
-            {% if event.bonus_text %}
-            <div class="bonus-highlight">
-                💰 {{ event.bonus_text }}
-            </div>
-            {% endif %}
-            
-            <div style="margin-top: 20px; font-size: 0.9rem; opacity: 0.8;">
-                ⏰ Akce je aktivní - nenech si ji ujít!
-            </div>
+<body data-new-gr-c-s-check-loaded="8.933.0" data-gr-ext-installed="" data-new-gr-c-s-loaded="8.933.0">
+<div class="sticky top-0 z-[1000] bg-white">
+    <div class="grid grid-cols-5 items-center p-4 md:grid-cols-12 md:pl-16 md:pr-12">
+        <div class="!z-[999] col-span-3 md:col-span-2"><a href="/"><img alt="Kaktus logo" loading="lazy" width="92"
+                                                                        height="24" decoding="async" data-nimg="1"
+                                                                        style="color:transparent"
+                                                                        src="/logo/kaktus-logo.svg"></a></div>
+        <div class="col-span-6 hidden md:col-span-7 md:hidden lg:block">
+            <div class="flex flex-row gap-16"><a class="!z-[999]" href="/koupit"><p class="
+                !z-[999]
+                text-lg font-semibold
+                hover:text-kaktus-green
+
+              ">Koupit</p></a><a class="!z-[999]"
+                                 href="https://sluzby.mujkaktus.cz/moje-sluzby/-/kaktus/portInUnlogged"><p class="
+                !z-[999]
+                text-lg font-semibold
+                hover:text-kaktus-green
+
+              ">Přenést číslo</p></a><a class="!z-[999]" href="/dobit-kredit"><p class="
+                !z-[999]
+                text-lg font-semibold
+                hover:text-kaktus-green
+
+              ">Dobít kredit</p></a><a class="!z-[999]" href="/nejcastejsi-dotazy"><p class="
+                !z-[999]
+                text-lg font-semibold
+                hover:text-kaktus-green
+
+              ">Dotazy</p></a></div>
         </div>
-        {% else %}
-        <div class="no-event">
-            Momentálně není dostupná žádná speciální akce.
-        </div>
-        {% endif %}
-        
-        <div class="footer-info">
-            <p>🧪 <strong>Test Server</strong> - Pro testování Kaktus bot notifikací</p>
-            <p>Změň obsah na <a href="/admin" style="color: #ffeb3b;">/admin</a> a sleduj reakci bota</p>
+        <div class="col-span-2 justify-self-end md:col-start-11 md:items-end md:self-end md:justify-self-end">
+            <div class="flex flex-row items-center gap-2 md:gap-12"><a class="!z-[999] hidden md:hidden lg:block"
+                                                                       href="https://sluzby.mujkaktus.cz/moje-sluzby">
+                <div class="flex flex-row gap-2"><p class="text-lg font-semibold">Samoobsluha</p><img
+                        alt="samoobsluha-ikona" loading="lazy" width="31" height="24" decoding="async" data-nimg="1"
+                        style="color:transparent" src="/selfcare-icon.svg"></div>
+            </a><a class="!z-[999]" href="/kosik">
+                <div class="flex min-w-[60px] flex-row items-center"><img alt="kosik-ikona" loading="lazy" width="23"
+                                                                          height="23" decoding="async" data-nimg="1"
+                                                                          style="color:transparent"
+                                                                          src="/cart-icon.svg"></div>
+            </a>
+                <div class="!z-[999] cursor-pointer md:block lg:hidden"><img alt="burger-icon" loading="lazy" width="0"
+                                                                             height="0" decoding="async" data-nimg="1"
+                                                                             style="color:transparent;width:100%;height:auto"
+                                                                             src="/burger-icon.svg"></div>
+            </div>
         </div>
     </div>
+</div>
+<main class="flex min-h-screen w-full flex-col justify-between"><!--$-->
+    <div class="mx-auto pt-12 md:pt-20"><h2 class="rotate-3 transform text-center text-mk-h2 md:text-k-h2">
+        {{ event.title }}</h2>
+        <div class="mx-auto max-w-[1200px] px-6">
+            <div class="grid grid-cols-1 items-center gap-6 py-10 md:grid-cols-2">
+                <div class="flex justify-center"><img alt="Dobíječka" loading="lazy" width="500" height="500"
+                                                      decoding="async" data-nimg="1" class="max-w-full"
+                                                      style="color:transparent"
+                                                      src="/dobijecka/kaktus-ilustrace-dobijecka.svg"></div>
+                <div class="text-body-copy">
+                    <div class="richTextStyles"><h4><strong>{{ event.time }}</strong></h4>
+                        <p><br></p>
+                        <p><strong>{{ event.description }}</strong><br>{{ event.bonus_text }} <a
+                                    href="http://kaktus.gods.cz/aplikace/d/premium1">apce</a>, <a
+                                    href="https://sluzby.mujkaktus.cz/moje-sluzby">sámošce</a> nebo vytočením *103#.
+                            <br><br><a
+                                    href="https://www.mujkaktus.cz/api/download?docUrl=%2Fapi%2Fdocuments%2Ffile%2FOP-Odmena-za-dobiti-FB_23092025.pdf&amp;filename=OP-Odmena-za-dobiti-FB_23092025.pdf"
+                                    rel="noopener noreferrer" target="_blank">Celé podmínky v PDF</a></p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="dobiti" class="w-full bg-cookies-3 bg-cover bg-no-repeat">
+        <div class="flex h-full w-full justify-center">
+            <div class="relative max-w-[1100px] pb-12">
+                <div>
+                    <div class="mt-20 flex flex-col md:flex-row" id="dobit-kredit">
+                        <div class="z-10 flex h-screen w-screen scale-125 transform items-center justify-center">
+                            <div class="pointer-events-none flex h-full w-full touch-none opacity-100 transition-opacity duration-300 ease-linear">
+                                <div class=""
+                                     style="width: 100%; height: 100%; pointer-events: none; touch-action: pan-y;">
+                                    <canvas style="vertical-align: top; width: 1100px; height: 640px;" width="1100"
+                                            height="640"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="relative inset-0 flex flex-col items-center justify-center md:absolute md:left-56">
+                            <div class="absolute -top-[585px] md:right-[60px] md:top-[120px]"><h2
+                                    class="text-mk-h2 md:text-k-h2">Dobij si, co</h2>
+                                <h2 class="text-mk-h2 md:text-k-h2">hrdlo ráčí</h2></div>
+                            <form>
+                                <div class="flex flex-col items-center">
+                                    <div class="relative m-2 mb-3 flex"><input
+                                            class="custom-autofill text z-10 flex overflow-auto bg-transparent p-3 text-white placeholder-white focus:border-transparent focus:outline-none sm:p-1.8 md:p-2.5 lg:p-2"
+                                            type="text" id="phone" placeholder="Telefonní číslo" name="phone">
+                                        <div class="absolute inset-0 -mb-1 -ml-2 bg-topup-number-input bg-cover bg-center md:-m-1"></div>
+                                    </div>
+                                    <div class="relative m-2 flex"><input
+                                            class="custom-autofill z-10 flex overflow-auto bg-transparent p-3 text-white placeholder-white focus:border-transparent focus:outline-none sm:p-1.8 md:p-2.5 lg:p-2"
+                                            type="text" id="amount" placeholder="Částka" name="amount">
+                                        <div class="absolute inset-0 -mb-1 -ml-2 bg-topup-amount-input bg-cover bg-center md:-m-1"></div>
+                                    </div>
+                                    <div></div>
+                                    <div class="z-10 ml-1 mt-2 md:ml-2">
+                                        <button value="Dobít"
+                                                class="cursor-pointer rounded font-bold bg-kaktus-green text-white hover:bg-[#288537] active:bg-black active:text-white  text-2xl pb-3 pl-10 pr-10 pt-3 ">
+                                            <p class="whitespace-nowrap">Dobít</p></button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div><!--$--><!--/$--><!--$--><!--/$--><!--/$--></main>
+<div class="z-[20] flex flex-col items-center gap-6 bg-black pb-12 pt-12 md:grid md:grid-cols-3">
+    <div class="justify-self-center">
+        <div><a href="/dokumenty">
+            <div class="-rotate-3 mt-4 text-k-h3 md:text-k-h3 text-kaktus-yellow cursor-pointer">Dokumenty</div>
+            <div class="mb-8 mt-4 text-k-h5 md:text-k-h5 text-kaktus-yellow cursor-pointer">ke stažení</div>
+        </a></div>
+        <div class="flex flex-col gap-1"><a href="/vseobecne-podminky">
+            <div class="text-desc text-white hover:text-kaktus-yellow transition-colors">Všeobecné podmínky</div>
+        </a><a href="/cenik">
+            <div class="text-desc text-white hover:text-kaktus-yellow transition-colors">Ceník</div>
+        </a><a href="/zasady-ochrany-osobnich-udaju">
+            <div class="text-desc text-white hover:text-kaktus-yellow transition-colors">Zásady ochrany osobních údajů
+            </div>
+        </a><a href="/cookies">
+            <div class="text-desc text-white hover:text-kaktus-yellow transition-colors">Cookies</div>
+        </a></div>
+    </div>
+    <div class="justify-self-center">
+        <div><a href="/nejcastejsi-dotazy">
+            <div class="-rotate-3 mt-4 text-k-h3 md:text-k-h3 text-kaktus-yellow cursor-pointer">Nejčastější</div>
+            <div class="mb-8 mt-4 text-k-h5 md:text-k-h5 text-kaktus-yellow cursor-pointer">dotazy</div>
+        </a></div>
+        <div class="flex flex-col gap-1"><a href="/nejcastejsi-dotazy#data-neresto">
+            <div class="text-desc text-white hover:text-kaktus-yellow transition-colors">Máte neomezený internet?</div>
+        </a><a href="/nejcastejsi-dotazy#neomezena-cisla">
+            <div class="text-desc text-white hover:text-kaktus-yellow transition-colors">Máte neomezené volání?</div>
+        </a><a href="/nejcastejsi-dotazy#prevod-jednotek">
+            <div class="text-desc text-white hover:text-kaktus-yellow transition-colors0">Převádějí se nevyčerpané
+                jednotky?
+            </div>
+        </a><a href="/nejcastejsi-dotazy#odmena">
+            <div class="text-desc text-white hover:text-kaktus-yellow transition-colors">Získám za dobití nějakou
+                odměnu?
+            </div>
+        </a></div>
+    </div>
+    <div class="row-span-1 mt-4 flex flex-col items-center gap-4 justify-self-center">
+        <div class="flex flex-row gap-6"><a href="https://www.instagram.com/mujkaktus/#"><img alt="instagram-icon"
+                                                                                              loading="lazy" width="0"
+                                                                                              height="0"
+                                                                                              decoding="async"
+                                                                                              data-nimg="1"
+                                                                                              style="color:transparent;height:50px;width:auto"
+                                                                                              src="/instagram-icon.svg"></a><a
+                href="https://www.facebook.com/Kaktus"><img alt="facebook-icon" loading="lazy" width="0" height="0"
+                                                            decoding="async" data-nimg="1"
+                                                            style="color:transparent;height:50px;width:auto"
+                                                            src="/facebook-icon.svg"></a><a
+                href="https://www.tiktok.com/@mujkaktus"><img alt="tik-tok-icon" loading="lazy" width="0" height="0"
+                                                              decoding="async" data-nimg="1"
+                                                              style="color:transparent;height:50px;width:auto"
+                                                              src="/tik-tok-icon.svg"></a><a
+                href="https://discord.gg/PJndRNv87h"><img alt="discord-icon" loading="lazy" width="0" height="0"
+                                                          decoding="async" data-nimg="1"
+                                                          style="color:transparent;height:50px;width:auto"
+                                                          src="/discord-icon.svg"></a></div>
+        <div class="flex flex-row gap-4 mt-4"><a
+                href="https://play.google.com/store/apps/details?id=com.zentity.tmcz.kaktus&amp;hl=cs&amp;pli=1"><img
+                alt="Stáhni aplikaci na Google Play" loading="lazy" width="150" height="50" decoding="async"
+                data-nimg="1" style="color:transparent" src="/google_play.svg"></a><a
+                href="https://apps.apple.com/cz/app/kaktus/id717625908?l=cs"><img alt="Stáhni aplikaci na App Store"
+                                                                                  loading="lazy" width="150" height="50"
+                                                                                  decoding="async" data-nimg="1"
+                                                                                  style="color:transparent"
+                                                                                  src="/app_store.svg"></a></div>
+    </div>
+</div>
 </body>
 </html>

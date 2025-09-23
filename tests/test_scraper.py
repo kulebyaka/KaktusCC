@@ -329,12 +329,61 @@ class TestScraperMonitoring:
         
         assert session.close
 
+class TestScraperLocalhostIntegration:
+
+    @pytest.fixture
+    def localhost_scraper(self, db_manager):
+        """Create KaktusScraper instance for localhost testing."""
+        return KaktusScraper('http://localhost:8080/', db_manager, 60)
+
+    def test_localhost_scraper_fetch_page(self, localhost_scraper):
+        """Test fetching page from localhost test server."""
+        result = localhost_scraper.fetch_page()
+
+        assert result is not None
+        assert isinstance(result, BeautifulSoup)
+        # Check for expected elements from the test server template
+        assert result.find('h2') is not None  # Should contain event title
+        assert 'dobíječka' in result.get_text().lower() or 'dobij' in result.get_text().lower()
+
+    def test_localhost_extract_latest_post(self, localhost_scraper):
+        """Test extracting post from localhost test server content."""
+        soup = localhost_scraper.fetch_page()
+
+        if soup is not None:
+            result = localhost_scraper.extract_latest_post(soup)
+
+            # The result depends on what the test server is serving
+            # but we should at least be able to parse it without errors
+            if result is not None:
+                assert 'title' in result
+                assert 'content' in result
+                assert 'post_hash' in result
+                assert isinstance(result['title'], str)
+                assert isinstance(result['content'], str)
+                assert len(result['post_hash']) > 0
+
+    def test_localhost_check_for_new_posts(self, localhost_scraper):
+        """Test checking for new posts from localhost server."""
+        # Mock database methods since we're testing extraction only
+        with patch.object(localhost_scraper.db_manager, 'is_post_processed', return_value=False), \
+             patch.object(localhost_scraper.db_manager, 'add_processed_post', return_value=True):
+
+            result = localhost_scraper.check_for_new_posts()
+
+            # Should either find a valid post or return None (both are valid)
+            if result is not None:
+                assert 'title' in result
+                assert 'content' in result
+                assert 'event_datetime' in result
+                assert 'post_hash' in result
+
 class TestScraperEdgeCases:
-    
+
     @pytest.fixture
     def scraper(self, db_manager):
         return KaktusScraper('https://test.example.com', db_manager, 60)
-    
+
     def test_extract_post_with_unicode_content(self, scraper):
         """Test extracting post with unicode characters."""
         html = '''
@@ -348,14 +397,14 @@ class TestScraperEdgeCases:
         </html>
         '''
         soup = BeautifulSoup(html, 'html.parser')
-        
+
         result = scraper.extract_latest_post(soup)
-        
+
         assert result is not None
         assert '🔋' in result['title']
         assert 'českou' in result['content']
         assert '📱' in result['content']
-    
+
     def test_extract_post_with_nested_content(self, scraper):
         """Test extracting post with nested HTML content."""
         html = '''
@@ -375,9 +424,9 @@ class TestScraperEdgeCases:
         </html>
         '''
         soup = BeautifulSoup(html, 'html.parser')
-        
+
         result = scraper.extract_latest_post(soup)
-        
+
         assert result is not None
         assert 'First paragraph' in result['content']
         assert 'Nested content' in result['content']

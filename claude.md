@@ -1,190 +1,225 @@
-# CLAUDE.md - Kaktus Telegram Notification Bot
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Project Overview
 
-This is a Telegram bot that monitors the T-Mobile Kaktus webpage (https://www.mujkaktus.cz/chces-pridat) for new promotional events and sends notifications to subscribed users. When a new event is posted, the bot sends an immediate notification and schedules a reminder for when the event starts.
+Telegram bot that monitors T-Mobile Kaktus webpage (https://www.mujkaktus.cz/chces-pridat) for promotional events and sends automated notifications to subscribers. Uses web scraping, PostgreSQL database, and Telegram's native message scheduling.
 
-## Core Functionality
+## Development Commands
 
-### 1. Web Scraping
-- Monitor https://www.mujkaktus.cz/chces-pridat for new posts
-- Extract event title (e.g., "Dobíječka 9.9.2025 15:00 - 18:00")
-- Extract event description/content
-- Parse Czech date/time format from the title
-- Check every 5 minutes for updates
-- Use SHA256 hash to detect duplicate posts
+### Testing
+```bash
+# Run all tests
+pytest
 
-### 2. Telegram Bot Features
-- `/start` command - Subscribe user to notifications
-- `/stop` command - Unsubscribe from notifications
-- Send immediate notification when new event is detected
-- Schedule automatic reminder using Telegram's `schedule_date` parameter
-- Handle Prague timezone (Europe/Prague) correctly
+# Run specific test categories
+pytest -m unit          # Unit tests only
+pytest -m integration   # Integration tests only
+pytest -m asyncio       # Async tests only
 
-### 3. Message Format
-- **Immediate notification**: Full title + complete event description
-- **Scheduled reminder**: Brief reminder sent at event start time
+# Run specific test files
+pytest tests/test_bot.py
+pytest tests/test_scraper.py
 
-## Technical Stack
+# Run with coverage
+pytest --cov=src --cov-report=html
 
-- **Language**: Python 3.11+
-- **Database**: PostgreSQL 15
-- **Deployment**: Docker Compose
-- **VPS**: Linux-based server with Docker installed
+# Test in Docker environment
+docker-compose exec bot python -m pytest
+```
 
-### Key Python Libraries
-- `python-telegram-bot==20.7` - Telegram Bot API wrapper
-- `beautifulsoup4==4.12.2` - HTML parsing
-- `requests==2.31.0` - HTTP requests
-- `psycopg2-binary==2.9.9` - PostgreSQL adapter
-- `SQLAlchemy==2.0.23` - ORM
-- `pytz==2023.3` - Timezone handling
-- `python-dotenv==1.0.0` - Environment variables
+### Local Development
+```bash
+# Install dependencies
+pip install -r requirements.txt
 
-## Database Schema
+# Run local PostgreSQL for development
+docker run -d -p 5432:5432 \
+  -e POSTGRES_DB=telegram_bot \
+  -e POSTGRES_USER=bot \
+  -e POSTGRES_PASSWORD=password \
+  postgres:15-alpine
 
+# Run bot locally (requires .env file)
+python src/main.py
+
+# Debug scraper independently
+python debug-scraper.py
+
+# Start test web server for local testing
+python test_server.py
+# Visit http://localhost:8080/admin to modify test events
+```
+
+### Docker Operations
+```bash
+# Local development with Docker
+docker-compose up -d
+docker-compose logs -f bot        # View bot logs
+docker-compose logs -f db         # View database logs
+
+# Production deployment (uses GHCR image)
+docker-compose -f docker-compose.prod.yml up -d
+
+# Build and test locally
+docker-compose build
+docker-compose up --build
+```
+
+## Architecture Overview
+
+### Core Components
+
+1. **KaktusNotificationApp** (`src/main.py`) - Main application orchestrator
+   - Initializes all components with proper dependency order
+   - Handles graceful shutdown via signal handlers
+   - Manages async task lifecycle and restart logic
+   - Coordinates between scraper and bot components
+
+2. **KaktusScraper** (`src/scraper.py`) - Web monitoring engine
+   - Fetches HTML from target URL every 5 minutes
+   - Extracts event data using BeautifulSoup4
+   - Calculates SHA256 hash for duplicate detection
+   - Parses Czech datetime format: `DD.MM.YYYY HH:MM - HH:MM`
+
+3. **TelegramBot** (`src/bot.py`) - User interaction handler
+   - Handles `/start` and `/stop` commands
+   - Sends immediate notifications to all active users
+   - Schedules reminder messages using Telegram's native scheduling
+   - Manages user blocking and rate limiting
+
+4. **DatabaseManager** (`src/database.py`) - Data persistence layer
+   - SQLAlchemy ORM with PostgreSQL backend
+   - Two main tables: `users` and `processed_posts`
+   - Handles user subscription state and post deduplication
+   - Connection pooling and transaction management
+
+### Key Design Patterns
+
+- **Async/Await**: Main loop, bot polling, and scraping operations
+- **Dependency Injection**: Components receive dependencies in constructor
+- **Task Restart Logic**: Failed scraper tasks are automatically restarted
+- **Graceful Shutdown**: Signal handlers ensure clean component teardown
+- **Error Isolation**: Component failures don't crash the entire application
+
+### Data Flow
+
+1. Scraper fetches webpage every 5 minutes
+2. HTML parsed and event data extracted
+3. SHA256 hash checked against `processed_posts` table
+4. If new post: immediate notification sent to all active users
+5. Event datetime parsed and scheduled reminder queued via Telegram API
+6. Post marked as processed to prevent re-sending
+
+## Critical Configuration
+
+### Environment Variables
+- `TELEGRAM_BOT_TOKEN` - Required bot token from @BotFather
+- `DATABASE_URL` - PostgreSQL connection string
+- `SCRAPE_URL` - Target webpage (default: https://www.mujkaktus.cz/chces-pridat)
+- `CHECK_INTERVAL` - Scraping interval in seconds (default: 300)
+- `TZ` - Timezone for date parsing (default: Europe/Prague)
+
+### Database Schema
 ```sql
--- Users table
+-- Users table: subscription management
 CREATE TABLE users (
-    chat_id BIGINT PRIMARY KEY,
-    username VARCHAR(255),
+    chat_id BIGINT PRIMARY KEY,           -- Telegram chat ID
+    username VARCHAR(255),                -- Telegram username
     first_started TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    is_active BOOLEAN DEFAULT TRUE,
+    is_active BOOLEAN DEFAULT TRUE,       -- Subscription status
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Processed posts table
+-- Processed posts: deduplication tracking
 CREATE TABLE processed_posts (
     id SERIAL PRIMARY KEY,
-    post_hash VARCHAR(64) UNIQUE NOT NULL,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    event_datetime TIMESTAMP WITH TIME ZONE,
+    post_hash VARCHAR(64) UNIQUE NOT NULL, -- SHA256 of content
+    title TEXT NOT NULL,                   -- Event title
+    content TEXT NOT NULL,                 -- Full event description
+    event_datetime TIMESTAMP WITH TIME ZONE, -- Parsed event start time
     notifications_sent BOOLEAN DEFAULT FALSE,
     processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 ```
 
-## Project Structure
-
-```
-kaktus-telegram-bot/
-├── docker-compose.yml      # Docker orchestration
-├── Dockerfile             # Container definition
-├── requirements.txt       # Python dependencies
-├── .env                  # Environment variables (not in git)
-├── .env.example          # Example environment file
-├── src/
-│   ├── __init__.py
-│   ├── main.py          # Application entry point
-│   ├── bot.py           # Telegram bot handlers
-│   ├── scraper.py       # Web scraping logic
-│   ├── database.py      # Database models and operations
-│   ├── config.py        # Configuration management
-│   └── utils.py         # Utility functions (date parsing, etc.)
-├── logs/                # Application logs
-└── tests/              # Unit tests
-```
-
-## Environment Variables
-
-```bash
-# Telegram Configuration
-TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
-
-# Database Configuration  
-DATABASE_URL=postgresql://bot:password@db:5432/telegram_bot
-
-# Scraping Configuration
-SCRAPE_URL=https://www.mujkaktus.cz/chces-pridat
-CHECK_INTERVAL=300  # seconds (5 minutes)
-
-# Application Configuration
-LOG_LEVEL=INFO
-TZ=Europe/Prague
-```
-
 ## Date/Time Parsing Rules
 
-The bot must parse Czech date format from titles:
-- Pattern: `DD.MM.YYYY HH:MM - HH:MM`
-- Example: `"Dobíječka 9.9.2025 15:00 - 18:00"`
-- Extract start time only (first time occurrence)
-- Always interpret in Prague timezone (Europe/Prague)
-- Convert to UTC timestamp for Telegram API
+**Critical for functionality**: Bot must correctly parse Czech date format from titles.
 
-## Error Handling Requirements
+- **Pattern**: `DD.MM.YYYY HH:MM - HH:MM`
+- **Example**: `"Dobíječka 9.9.2025 15:00 - 18:00"`
+- **Extract**: Start time only (first time occurrence)
+- **Timezone**: Always interpret as Europe/Prague
+- **Output**: Convert to UTC timestamp for Telegram API
 
-1. **Network Failures**: Retry with exponential backoff
-2. **Telegram Rate Limits**: Implement message batching (max 30 msg/sec)
-3. **Invalid Dates**: Skip scheduled message if date parsing fails
-4. **User Blocks**: Mark user as inactive if bot is blocked
-5. **Duplicate Posts**: Use hash comparison to prevent re-sending
+**Implementation**: See `src/utils.py:parse_czech_datetime()`
 
 ## Telegram API Specifics
 
-### Message Scheduling
-- Use `schedule_date` parameter (Unix timestamp)
-- Maximum: 365 days in advance
-- Minimum: 10 seconds in future
-- Cannot modify/cancel once scheduled
+### Message Scheduling Implementation
+- **Method**: Uses `python-telegram-bot` JobQueue with `run_once()` method
+- **Limitation**: Telegram Bot API doesn't support native message scheduling
+- **Implementation**: `schedule_reminder()` creates JobQueue job with delay until event time
+- **Persistence**: Jobs are lost on bot restart (not database-backed)
+- **Maximum delay**: Limited by JobQueue implementation (based on APScheduler)
+- **Rate Limit**: 30 messages per second to different users
 
-### Rate Limits
-- 30 messages per second to different users
-- Use async operations for efficiency
-- Batch processing when sending to multiple users
+### Error Handling Requirements
+1. **User Blocks Bot**: Mark user as inactive, don't retry
+2. **Rate Limits**: Implement exponential backoff, batch messages
+3. **Network Failures**: Retry with exponential backoff (scraper)
+4. **Invalid Dates**: Skip scheduled message, log error
+5. **Duplicate Posts**: Use hash comparison, never re-send
 
-## Deployment Notes
+## Testing Architecture
 
-### Docker Compose Services
-1. **bot**: Main Python application
-   - Depends on database
-   - Auto-restart policy
-   - Volume mount for logs
+### Test Categories
+- **Unit tests** (`tests/test_*.py`): Individual component testing with mocks
+- **Integration tests** (`tests/test_main.py`): Component interaction testing
+- **Async tests**: All marked with `@pytest.mark.asyncio`
 
-2. **db**: PostgreSQL database
-   - Alpine variant for smaller size
-   - Persistent volume for data
-   - Internal network only
+### Key Test Fixtures (`tests/conftest.py`)
+- `test_db`: In-memory SQLite database for testing
+- `db_manager`: Configured DatabaseManager instance
+- `mock_telegram_bot`: Mocked Telegram bot for testing
+- `sample_html`: Sample HTML content for scraper testing
 
-### Security Considerations
-- Bot token must be kept secret
-- Database credentials in environment variables
-- No public database port exposure
-- Use read-only scraping (no authentication needed)
+### Test Execution Strategy
+- Uses in-memory SQLite for fast database tests
+- Mocks all external dependencies (HTTP requests, Telegram API)
+- Comprehensive error scenario coverage
+- Cross-platform compatibility (Windows/Linux/macOS)
 
-## Testing Checklist
+## Debugging and Monitoring
 
-- [ ] Bot responds to `/start` command
-- [ ] User gets saved to database
-- [ ] Webpage scraping extracts correct data
-- [ ] Date parsing handles Czech format
-- [ ] Duplicate detection works correctly
-- [ ] Immediate notification sent to all users
-- [ ] Scheduled message sent at correct time
-- [ ] Timezone conversion is accurate
-- [ ] Bot handles `/stop` command
-- [ ] Database persists after container restart
+### Debug Tools
+- `debug-scraper.py`: Test scraper independently without database
+- `test_server.py`: Local web server mimicking Kaktus website structure
+- Docker logs: `docker-compose logs -f bot`
 
-## Common Issues & Solutions
+### Log Analysis
+- All components use structured logging with timestamps
+- Log levels: DEBUG (development), INFO (production)
+- Key log points: New posts detected, notifications sent, errors
 
-### Issue: Scheduled messages sent at wrong time
-**Solution**: Ensure Prague timezone is properly converted to UTC timestamp
+### Common Issues
+1. **Wrong notification times**: Check timezone conversion in logs
+2. **Duplicate notifications**: Verify `post_hash` calculation consistency
+3. **Bot not responding**: Check bot token and user blocking status
+4. **Scraper failures**: Review network connectivity and HTML structure changes
+5. **Missing scheduled messages**: Check for bot restart (JobQueue jobs don't persist) or invalid event times
 
-### Issue: Duplicate notifications
-**Solution**: Check post_hash is being calculated consistently
+## Deployment Patterns
 
-### Issue: Bot doesn't respond
-**Solution**: Verify bot token and that bot is not blocked by user
+### Development
+- Local Python with external PostgreSQL
+- Full Docker Compose stack for integration testing
+- Test server for controlled webpage simulation
 
-### Issue: Memory leaks in long-running process
-**Solution**: Use connection pooling for database, close requests sessions
-
-## Future Enhancements (Not Implemented)
-
-- Web dashboard for statistics
-- User preferences (notification types)
-- Multiple webpage monitoring
-- Rich message formatting (photos, buttons)
-- Admin commands for bot management
-- Backup scheduled messages in database (fallback)
+### Production
+- Uses pre-built GHCR image: `ghcr.io/kulebyaka/kaktuscc:latest`
+- Production compose file: `docker-compose.prod.yml`
+- Health checks and restart policies for reliability
+- Volume persistence for database and logs

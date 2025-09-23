@@ -148,7 +148,13 @@
             <div class="form-group">
                 <label for="title">Event Title:</label>
                 <input type="text" id="title" name="title" value="{{ event.title }}" required>
-                <div class="help-text">Format: "Dobíječka DD.MM.YYYY HH:MM - HH:MM" (bot detects dates from this)</div>
+                <div class="help-text">Format: "Dobíječka or something</div>
+            </div>
+
+            <div class="form-group">
+                <label for="time">Event Time:</label>
+                <input type="text" id="time" name="time" value="{{ event.time }}" required>
+                <div class="help-text">Format: "DD.MM.YYYY HH:MM - HH:MM" (bot detects dates from this)</div>
             </div>
             
             <div class="form-group">

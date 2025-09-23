@@ -103,44 +103,80 @@ class TelegramBot:
         logger.info(f"Sent immediate notifications to {successful_sends}/{len(active_users)} users")
     
     async def schedule_reminder(self, post_data: Dict[str, Any]):
-        """Schedule reminder message for event start time."""
+        """Schedule reminder message for event start time using JobQueue."""
         event_datetime = post_data.get('event_datetime')
-        
+
         if not event_datetime:
             logger.info("No event datetime, skipping scheduled reminder")
             return
-        
+
         if not is_valid_schedule_time(event_datetime):
             logger.warning(f"Event time {event_datetime} is not valid for scheduling")
             return
-        
-        active_users = self.db_manager.get_active_users()
-        
-        if not active_users:
-            logger.info("No active users for scheduled reminder")
+
+        # Calculate delay until event start time
+        now = datetime.now(event_datetime.tzinfo)
+        delay_seconds = (event_datetime - now).total_seconds()
+
+        if delay_seconds <= 0:
+            logger.warning(f"Event time {event_datetime} is in the past, skipping scheduled reminder")
             return
-        
-        schedule_timestamp = datetime_to_unix_timestamp(event_datetime)
-        reminder_message = f"⏰ **Připomínka: Kaktus akce začíná nyní!**\n\n**{post_data['title']}**"
-        
-        successful_schedules = 0
-        
-        for chat_id in active_users:
-            try:
-                await self.application.bot.send_message(
-                    chat_id=chat_id,
-                    text=reminder_message,
-                    parse_mode='Markdown',
-                    schedule_date=schedule_timestamp
-                )
-                successful_schedules += 1
-                
-                await asyncio.sleep(0.05)
-                
-            except Exception as e:
-                logger.error(f"Error scheduling reminder for {chat_id}: {e}")
-        
-        logger.info(f"Scheduled reminders for {successful_schedules}/{len(active_users)} users at {event_datetime}")
+
+        logger.info(f"Scheduling reminder in {delay_seconds} seconds ({event_datetime})")
+
+        # Schedule job using JobQueue
+        if self.application.job_queue is None:
+            logger.error("JobQueue not available. Install with: pip install 'python-telegram-bot[job-queue]'")
+            return
+
+        self.application.job_queue.run_once(
+            callback=self._send_reminder_job,
+            when=delay_seconds,
+            data=post_data,
+            name=f"reminder_{post_data.get('post_hash', 'unknown')}"
+        )
+
+    async def _send_reminder_job(self, context: ContextTypes.DEFAULT_TYPE):
+        """Job callback to send reminder message."""
+        post_data = context.job.data
+
+        try:
+            # Get active users at the time of sending (not when scheduled)
+            active_users = self.db_manager.get_active_users()
+
+            if not active_users:
+                logger.info("No active users for scheduled reminder")
+                return
+
+            reminder_message = f"⏰ **Připomínka: Kaktus akce začíná nyní!**\n\n**{post_data['title']}**"
+
+            successful_sends = 0
+
+            for chat_id in active_users:
+                try:
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text=reminder_message,
+                        parse_mode='Markdown'
+                    )
+                    successful_sends += 1
+
+                    await asyncio.sleep(0.05)
+
+                except Forbidden:
+                    logger.warning(f"Bot blocked by user {chat_id}, marking as inactive")
+                    self.db_manager.mark_user_inactive_on_block(chat_id)
+
+                except BadRequest as e:
+                    logger.error(f"Bad request when sending reminder to {chat_id}: {e}")
+
+                except Exception as e:
+                    logger.error(f"Error sending reminder to {chat_id}: {e}")
+
+            logger.info(f"Sent scheduled reminders to {successful_sends}/{len(active_users)} users for: {post_data['title']}")
+
+        except Exception as e:
+            logger.error(f"Error in reminder job: {e}")
     
     async def handle_new_post(self, post_data: Dict[str, Any]):
         """Handle new post by sending immediate notification and scheduling reminder."""

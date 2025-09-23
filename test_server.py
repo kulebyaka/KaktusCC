@@ -13,7 +13,8 @@ app.secret_key = 'test-secret-key-for-kaktus-testing'
 
 # Store current event data
 current_event = {
-    'title': 'Dobíječka 20.9.2025 15:00 - 18:00',
+    'title': 'Dobíječka',
+    'time': '20.9.2025 15:00 - 18:00',
     'description': 'Získej 50 Kč navíc při dobití 200 Kč! Akce platí pouze dnes.',
     'bonus_text': 'Bonus 50 Kč při dobití 200 Kč nebo více',
     'active': True
@@ -35,7 +36,8 @@ def update_event():
     global current_event
     
     current_event['title'] = request.form['title']
-    current_event['description'] = request.form['description'] 
+    current_event['time'] = request.form['time']
+    current_event['description'] = request.form['description']
     current_event['bonus_text'] = request.form['bonus_text']
     current_event['active'] = 'active' in request.form
     
