@@ -2,16 +2,6 @@
 
 A Telegram bot that monitors the T-Mobile Kaktus webpage for new promotional events and sends automated notifications to subscribed users. When a new event is posted, the bot sends an immediate notification and schedules a reminder for when the event starts.
 
-## Features
-
-- **Automated Monitoring**: Checks https://www.mujkaktus.cz/chces-pridat every 5 minutes for new posts
-- **Instant Notifications**: Sends immediate alerts when new events are detected
-- **Smart Scheduling**: Automatically schedules reminder messages for event start times using Telegram's native scheduling
-- **Duplicate Prevention**: Uses SHA256 hashing to avoid sending duplicate notifications
-- **Prague Timezone Support**: Properly handles Czech date/time formats (`DD.MM.YYYY HH:MM - HH:MM`)
-- **User Management**: Simple subscription system with `/start` and `/stop` commands
-- **Robust Error Handling**: Network retries, rate limiting, and graceful failure handling
-
 ## Quick Start with Docker
 
 ### Using Pre-built Image from GHCR
@@ -81,54 +71,6 @@ docker-compose up -d
 - **Deployment**: Docker Compose
 - **Key Libraries**: python-telegram-bot, BeautifulSoup4, SQLAlchemy, pytz
 
-## Architecture
-
-### Database Schema
-
-```sql
--- Users table
-CREATE TABLE users (
-    chat_id BIGINT PRIMARY KEY,
-    username VARCHAR(255),
-    first_started TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    is_active BOOLEAN DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- Processed posts table
-CREATE TABLE processed_posts (
-    id SERIAL PRIMARY KEY,
-    post_hash VARCHAR(64) UNIQUE NOT NULL,
-    title TEXT NOT NULL,
-    content TEXT NOT NULL,
-    event_datetime TIMESTAMP WITH TIME ZONE,
-    notifications_sent BOOLEAN DEFAULT FALSE,
-    processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-```
-
-### Project Structure
-
-```
-kaktus-telegram-bot/
-├── docker-compose.yml      # Local development
-├── docker-compose.prod.yml # Production with GHCR image
-├── Dockerfile             # Container definition
-├── requirements.txt       # Python dependencies
-├── src/
-│   ├── main.py          # Application entry point
-│   ├── bot.py           # Telegram bot handlers
-│   ├── scraper.py       # Web scraping logic
-│   ├── database.py      # Database models and operations
-│   ├── config.py        # Configuration management
-│   └── utils.py         # Utility functions (date parsing, etc.)
-├── tests/              # Comprehensive test suite
-├── logs/               # Application logs
-└── templates/          # Test HTML templates
-```
-
-## Development
-
 ### Local Development Setup
 
 1. **Install dependencies**
@@ -168,39 +110,11 @@ docker-compose exec bot python -m pytest
 python -m pytest tests/
 ```
 
-#### Test Coverage
-The test suite includes:
-- Bot command handling (`/start`, `/stop`)
-- Web scraping functionality
-- Date parsing (Czech format)
-- Database operations
-- Duplicate detection
-- Configuration management
-
 #### Test Server
 For testing notifications locally:
 ```bash
 python test_server.py
 # Visit http://localhost:8080/admin to modify test events
-```
-
-### Monitoring and Debugging
-
-#### View Application Logs
-```bash
-# All services
-docker-compose logs -f
-
-# Bot only
-docker-compose logs -f bot
-
-# Database only
-docker-compose logs -f db
-```
-
-#### Debug Scraper
-```bash
-python debug-scraper.py
 ```
 
 ## Deployment
@@ -217,76 +131,6 @@ docker pull ghcr.io/kulebyaka/kaktuscc:latest
 docker-compose -f docker-compose.prod.yml up -d
 ```
 
-### Production Deployment
-
-1. **Server Requirements**
-   - Linux VPS with Docker installed
-   - Minimum 1GB RAM
-   - Persistent storage for database
-
-2. **Environment Setup**
-   ```bash
-   export TELEGRAM_BOT_TOKEN="your_bot_token_here"
-   export GITHUB_REPOSITORY="kulebyaka/kaktuscc"
-   ```
-
-3. **Deploy**
-   ```bash
-   docker-compose -f docker-compose.prod.yml up -d
-   ```
-
-## Troubleshooting
-
-### Common Issues
-
-#### Bot doesn't respond to commands
-- ✅ Verify `TELEGRAM_BOT_TOKEN` is correct
-- ✅ Check if bot is blocked by the user
-- ✅ Review logs for error messages: `docker-compose logs -f bot`
-
-#### Duplicate notifications sent
-- ✅ Ensure `post_hash` calculation is consistent
-- ✅ Check database connectivity
-- ✅ Verify processed_posts table is being updated
-
-#### Wrong notification times
-- ✅ Verify timezone configuration (`TZ=Europe/Prague`)
-- ✅ Check date parsing logic in logs
-- ✅ Ensure Prague timezone conversion to UTC is correct
-
-#### Database connection errors
-- ✅ Ensure PostgreSQL container is running: `docker-compose ps`
-- ✅ Verify `DATABASE_URL` format
-- ✅ Check network connectivity between containers
-
-#### Scheduled messages not sent
-- ✅ Verify event datetime is in the future
-- ✅ Check that datetime is within Telegram's limits (max 365 days)
-- ✅ Ensure timezone conversion is accurate
-
-### Rate Limiting
-
-The bot respects Telegram's API limits:
-- Maximum 30 messages per second to different users
-- Uses async operations for efficiency
-- Implements message batching for multiple subscribers
-- Exponential backoff for network failures
-
-### Data Persistence
-
-- Database data persists in Docker volumes
-- Logs are stored in the `logs/` directory
-- Configuration is managed through environment variables
-
-## Security Considerations
-
-- ✅ Bot token must be kept secret (use environment variables)
-- ✅ Database credentials in environment variables only
-- ✅ No public database port exposure
-- ✅ Read-only web scraping (no authentication needed)
-- ✅ Input validation for user commands
-- ✅ Proper error handling to prevent information leaks
-
 ## API Limitations
 
 ### Telegram Message Scheduling
@@ -295,36 +139,6 @@ The bot respects Telegram's API limits:
 - Minimum: 10 seconds in future
 - Cannot modify or cancel once scheduled
 - Prague timezone converted to UTC for API
-
-### Date/Time Parsing Rules
-- Pattern: `DD.MM.YYYY HH:MM - HH:MM`
-- Example: `"Dobíječka 9.9.2025 15:00 - 18:00"`
-- Extract start time only (first time occurrence)
-- Always interpret in Prague timezone (`Europe/Prague`)
-- Convert to UTC timestamp for Telegram API
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass: `python -m pytest`
-6. Commit your changes (`git commit -m 'Add amazing feature'`)
-7. Push to the branch (`git push origin feature/amazing-feature`)
-8. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For issues and questions:
-1. Check the troubleshooting section above
-2. Review application logs: `docker-compose logs -f bot`
-3. Run the test suite: `python -m pytest tests/`
-4. Open an issue on GitHub with detailed information
 
 ---
 
