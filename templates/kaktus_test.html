@@ -133,6 +133,7 @@
     </div>
 </div>
 <main class="flex min-h-screen w-full flex-col justify-between"><!--$-->
+    {% if event.active %}
     <div class="mx-auto pt-12 md:pt-20"><h2 class="rotate-3 transform text-center text-mk-h2 md:text-k-h2">
         {{ event.title }}</h2>
         <div class="mx-auto max-w-[1200px] px-6">
@@ -154,6 +155,14 @@
             </div>
         </div>
     </div>
+    {% else %}
+    <div class="mx-auto pt-12 md:pt-20">
+        <div class="mx-auto max-w-[1200px] px-6 py-20 text-center">
+            <h2 class="text-mk-h2 md:text-k-h2 mb-6">Momentálně není dostupná žádná speciální akce</h2>
+            <p class="text-lg opacity-80">Sleduj tuto stránku pro nejnovější nabídky a akce!</p>
+        </div>
+    </div>
+    {% endif %}
     <div id="dobiti" class="w-full bg-cookies-3 bg-cover bg-no-repeat">
         <div class="flex h-full w-full justify-center">
             <div class="relative max-w-[1100px] pb-12">
