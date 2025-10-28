@@ -37,9 +37,24 @@ def parse_czech_datetime(title: str, timezone: str = 'Europe/Prague') -> Optiona
         logger.error(f"Error parsing datetime from {title[:100]}: {e}")
         return None
 
-def calculate_post_hash(title: str, content: str) -> str:
-    """Calculate SHA256 hash for post deduplication."""
-    combined = f"{title.strip()}{content.strip()}"
+def calculate_post_hash(title: str, event_datetime: Optional[datetime] = None) -> str:
+    """Calculate SHA256 hash for post deduplication based on title and event datetime.
+
+    Args:
+        title: Event title (e.g., "Dobíječka 20.9.2025 15:00 - 18:00")
+        event_datetime: Parsed event datetime (optional, for additional uniqueness)
+
+    Returns:
+        SHA256 hash of title and datetime
+    """
+    # Use title as primary identifier
+    combined = title.strip()
+
+    # Add event datetime if available for additional uniqueness
+    if event_datetime:
+        # Use ISO format for consistent string representation
+        combined += event_datetime.isoformat()
+
     return hashlib.sha256(combined.encode('utf-8')).hexdigest()
 
 def datetime_to_unix_timestamp(dt: datetime) -> int:

@@ -164,6 +164,7 @@ class TelegramBot:
             await asyncio.sleep(0.05)
 
         logger.info(f"Sent immediate notifications to {successful_sends}/{len(active_users)} users")
+        return successful_sends > 0
     
     async def schedule_reminder(self, post_data: Dict[str, Any]):
         """Schedule reminder message for event start time using JobQueue."""
@@ -241,10 +242,11 @@ class TelegramBot:
         """Handle new post by sending immediate notification and scheduling reminder."""
         logger.info(f"Handling new post: {post_data['title']}")
 
-        await self.send_immediate_notification(post_data)
+        success = await self.send_immediate_notification(post_data)
 
         # Mark notifications as sent after successful delivery
-        self.db_manager.mark_notifications_sent(post_data['post_hash'])
+        if success:
+            self.db_manager.mark_notifications_sent(post_data['post_hash'])
 
         await self.schedule_reminder(post_data)
     

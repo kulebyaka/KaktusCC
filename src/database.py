@@ -180,6 +180,38 @@ class DatabaseManager:
         finally:
             session.close()
 
+    def add_past_post(self, post_hash: str, title: str, content: str,
+                      event_datetime: Optional[datetime] = None) -> bool:
+        """Add a past event post to database with notifications_sent=True.
+        This is used during deployment to skip sending notifications for old events.
+
+        Returns True if newly added, False if already exists."""
+        session = self.get_session()
+        try:
+            # Check if post already exists
+            existing = session.query(ProcessedPost).filter(ProcessedPost.post_hash == post_hash).first()
+            if existing:
+                logger.debug(f"Past post already exists in database: {title}")
+                return False
+
+            post = ProcessedPost(
+                post_hash=post_hash,
+                title=title,
+                content=content,
+                event_datetime=event_datetime,
+                notifications_sent=True  # Mark as sent to skip notifications
+            )
+            session.add(post)
+            session.commit()
+            logger.info(f"Added past post (notifications skipped): {title}")
+            return True
+        except Exception as e:
+            logger.error(f"Error adding past post: {e}")
+            session.rollback()
+            return False
+        finally:
+            session.close()
+
     def mark_notifications_sent(self, post_hash: str) -> bool:
         """Mark notifications as sent for a processed post."""
         session = self.get_session()

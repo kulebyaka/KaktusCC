@@ -1,10 +1,10 @@
 import requests
 from bs4 import BeautifulSoup
-import time
 import logging
 from typing import Optional, Dict, Any
 from datetime import datetime
 import asyncio
+import pytz
 from .utils import calculate_post_hash, parse_czech_datetime
 from .database import DatabaseManager
 
@@ -113,7 +113,7 @@ class KaktusScraper:
                     'title': title,
                     'content': content,
                     'event_datetime': event_datetime,
-                    'post_hash': calculate_post_hash(title, content)
+                    'post_hash': calculate_post_hash(title, event_datetime)
                 }
 
                 logger.info(f"Extracted Kaktus event: {title}")
@@ -141,14 +141,14 @@ class KaktusScraper:
                     
                     if promo_text:
                         title = "Kaktus akce" + (f" {event_datetime.strftime('%d.%m.%Y')}" if event_datetime else "")
-                        
+
                         post_data = {
                             'title': title,
                             'content': promo_text,
                             'event_datetime': event_datetime,
-                            'post_hash': calculate_post_hash(title, promo_text)
+                            'post_hash': calculate_post_hash(title, event_datetime)
                         }
-                        
+
                         logger.info(f"Extracted promotional content: {title}")
                         return post_data
             
@@ -167,14 +167,14 @@ class KaktusScraper:
                 if meaningful_content:
                     title = "Kaktus - aktuální nabídka"
                     content = ' '.join(meaningful_content[:3])
-                    
+
                     post_data = {
                         'title': title,
                         'content': content,
                         'event_datetime': None,
-                        'post_hash': calculate_post_hash(title, content)
+                        'post_hash': calculate_post_hash(title, None)
                     }
-                    
+
                     logger.info(f"Extracted general content: {title}")
                     return post_data
             
@@ -201,22 +201,51 @@ class KaktusScraper:
             logger.debug("Post already processed with notifications sent, skipping")
             return None
 
-        # Try to add the post (will fail silently if already exists due to unique constraint)
-        # This handles the case where post exists but notifications weren't sent
-        added = self.db_manager.add_processed_post(
-            post_data['post_hash'],
-            post_data['title'],
-            post_data['content'],
-            post_data['event_datetime']
-        )
+        # Check if event is in the past
+        event_datetime = post_data.get('event_datetime')
+        is_past_event = False
 
-        if added:
-            logger.info(f"New post detected: {post_data['title']}")
+        if event_datetime:
+            now = datetime.now(pytz.UTC)
+            # Convert event_datetime to UTC for comparison
+            if event_datetime.tzinfo is None:
+                event_datetime_utc = pytz.UTC.localize(event_datetime)
+            else:
+                event_datetime_utc = event_datetime.astimezone(pytz.UTC)
+
+            is_past_event = event_datetime_utc < now
+
+        # Use different database methods based on whether event is in the past
+        if is_past_event:
+            # Add past event with notifications_sent=True to skip sending
+            added = self.db_manager.add_past_post(
+                post_data['post_hash'],
+                post_data['title'],
+                post_data['content'],
+                post_data['event_datetime']
+            )
+
+            if added:
+                logger.info(f"Past event detected and skipped: {post_data['title']}")
+
+            # Don't send notifications for past events
+            return None
         else:
-            logger.info(f"Post exists but notifications not sent, retrying: {post_data['title']}")
+            # Add regular post with notifications_sent=False
+            added = self.db_manager.add_processed_post(
+                post_data['post_hash'],
+                post_data['title'],
+                post_data['content'],
+                post_data['event_datetime']
+            )
 
-        # Return post_data regardless - either new or needs retry
-        return post_data
+            if added:
+                logger.info(f"New post detected: {post_data['title']}")
+            else:
+                logger.info(f"Post exists but notifications not sent, retrying: {post_data['title']}")
+
+            # Return post_data for notification sending
+            return post_data
     
     async def start_monitoring(self, callback):
         """Start monitoring for new posts."""
