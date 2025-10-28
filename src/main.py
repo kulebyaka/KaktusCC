@@ -56,19 +56,43 @@ class KaktusNotificationApp:
         def signal_handler(signum, frame):
             logger.info(f"Received signal {signum}, initiating shutdown...")
             self.running = False
-        
+
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
+
+    async def retry_unsent_notifications(self):
+        """Check for and retry sending notifications for posts that weren't sent."""
+        try:
+            unsent_posts = self.db_manager.get_unsent_posts()
+
+            if not unsent_posts:
+                logger.info("No unsent notifications to retry")
+                return
+
+            logger.info(f"Found {len(unsent_posts)} posts with unsent notifications, retrying...")
+
+            for post_data in unsent_posts:
+                try:
+                    await self.bot.handle_new_post(post_data)
+                    logger.info(f"Successfully retried notifications for: {post_data['title']}")
+                except Exception as e:
+                    logger.error(f"Failed to retry notifications for {post_data['title']}: {e}")
+
+        except Exception as e:
+            logger.error(f"Error during unsent notifications retry: {e}")
     
     async def run(self):
         """Main application loop."""
         await self.initialize()
-        
+
         self.setup_signal_handlers()
         self.running = True
-        
+
         logger.info("Starting main application loop...")
-        
+
+        # Check for and retry any unsent notifications from previous runs
+        await self.retry_unsent_notifications()
+
         # Start bot polling updater
         await self.bot.application.updater.start_polling(drop_pending_updates=True)
         

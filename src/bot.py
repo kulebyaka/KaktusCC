@@ -6,7 +6,7 @@ from typing import Dict, Any, Callable, Optional
 from datetime import datetime
 import asyncio
 from .database import DatabaseManager
-from .utils import datetime_to_unix_timestamp, is_valid_schedule_time
+from .utils import datetime_to_unix_timestamp, is_valid_schedule_time, escape_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ class TelegramBot:
         self,
         chat_id: int,
         message: str,
-        parse_mode: str = 'Markdown',
+        parse_mode: str = 'MarkdownV2',
         max_retries: int = 4,
         bot = None
     ) -> bool:
@@ -36,7 +36,7 @@ class TelegramBot:
         Args:
             chat_id: Telegram chat ID
             message: Message text to send
-            parse_mode: Message parse mode (default: Markdown)
+            parse_mode: Message parse mode (default: MarkdownV2)
             max_retries: Maximum number of retry attempts (default: 4)
             bot: Bot instance to use (default: self.application.bot)
 
@@ -145,7 +145,11 @@ class TelegramBot:
             logger.info("No active users to notify")
             return
 
-        message = f"🌵 **Nová Kaktus akce!**\n\n**{post_data['title']}**\n\n{post_data['content']}"
+        # Escape title and content to prevent Markdown parsing errors
+        escaped_title = escape_markdown(post_data['title'])
+        escaped_content = escape_markdown(post_data['content'])
+
+        message = f"🌵 *Nová Kaktus akce\\!*\n\n*{escaped_title}*\n\n{escaped_content}"
 
         successful_sends = 0
 
@@ -207,7 +211,10 @@ class TelegramBot:
                 logger.info("No active users for scheduled reminder")
                 return
 
-            reminder_message = f"⏰ **Připomínka: Kaktus akce začíná nyní!**\n\n**{post_data['title']}**"
+            # Escape title to prevent Markdown parsing errors
+            escaped_title = escape_markdown(post_data['title'])
+
+            reminder_message = f"⏰ *Připomínka: Kaktus akce začíná nyní\\!*\n\n*{escaped_title}*"
 
             successful_sends = 0
 
@@ -233,9 +240,12 @@ class TelegramBot:
     async def handle_new_post(self, post_data: Dict[str, Any]):
         """Handle new post by sending immediate notification and scheduling reminder."""
         logger.info(f"Handling new post: {post_data['title']}")
-        
+
         await self.send_immediate_notification(post_data)
-        
+
+        # Mark notifications as sent after successful delivery
+        self.db_manager.mark_notifications_sent(post_data['post_hash'])
+
         await self.schedule_reminder(post_data)
     
     async def start_bot(self):

@@ -176,11 +176,13 @@ class TestDatabaseManagerPosts:
     def test_is_post_processed_existing_post(self, db_manager):
         """Test checking if an existing post is processed."""
         db_manager.create_tables()
-        
+
+        # Add post and mark notifications as sent
         db_manager.add_processed_post('existing_hash', 'Test Title', 'Test Content')
-        
+        db_manager.mark_notifications_sent('existing_hash')
+
         result = db_manager.is_post_processed('existing_hash')
-        
+
         assert result is True
     
     def test_add_processed_post_success(self, db_manager):
@@ -209,7 +211,7 @@ class TestDatabaseManagerPosts:
             assert post.title == 'Test Title'
             assert post.content == 'Test Content'
             assert post.event_datetime == event_time
-            assert post.notifications_sent is True
+            assert post.notifications_sent is False
         finally:
             session.close()
     
