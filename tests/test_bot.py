@@ -4,7 +4,7 @@ from unittest.mock import Mock, patch, MagicMock, AsyncMock
 from datetime import datetime
 import pytz
 from telegram import Update, User as TelegramUser, Chat, Message
-from telegram.error import Forbidden, BadRequest
+from telegram.error import Forbidden, BadRequest, NetworkError, TimedOut
 
 from src.bot import TelegramBot
 from src.database import DatabaseManager
@@ -370,9 +370,191 @@ class TestBotEdgeCases:
              patch('src.bot.datetime_to_unix_timestamp', return_value=1234567890), \
              patch.object(bot.application.bot, 'send_message', new_callable=AsyncMock), \
              patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
-            
+
             await bot.schedule_reminder(sample_post_data)
-            
+
             assert mock_sleep.call_count == 3
             for call in mock_sleep.call_args_list:
                 assert call[0][0] == 0.05
+
+class TestNetworkErrorRetry:
+    """Test network error retry logic with exponential backoff."""
+
+    @pytest.fixture
+    def bot(self, db_manager):
+        return TelegramBot('test_token_123', db_manager)
+
+    @pytest.mark.asyncio
+    async def test_send_message_with_retry_success_first_attempt(self, bot):
+        """Test successful message send on first attempt."""
+        mock_bot = AsyncMock()
+        mock_bot.send_message = AsyncMock()
+
+        result = await bot._send_message_with_retry(12345, "Test message", bot=mock_bot)
+
+        assert result is True
+        assert mock_bot.send_message.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_send_message_with_retry_network_error_then_success(self, bot):
+        """Test retry after NetworkError, then success."""
+        mock_bot = AsyncMock()
+        mock_bot.send_message = AsyncMock()
+
+        with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+            # Fail first attempt, succeed on second
+            mock_bot.send_message.side_effect = [NetworkError("Connection failed"), None]
+
+            result = await bot._send_message_with_retry(12345, "Test message", bot=mock_bot)
+
+            assert result is True
+            assert mock_bot.send_message.call_count == 2
+            mock_sleep.assert_called_once_with(2)  # First retry delay
+
+    @pytest.mark.asyncio
+    async def test_send_message_with_retry_timeout_then_success(self, bot):
+        """Test retry after TimedOut error, then success."""
+        mock_bot = AsyncMock()
+        mock_bot.send_message = AsyncMock()
+
+        with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+            # Fail twice with timeout, succeed on third
+            mock_bot.send_message.side_effect = [
+                TimedOut("Request timed out"),
+                TimedOut("Request timed out"),
+                None
+            ]
+
+            result = await bot._send_message_with_retry(12345, "Test message", bot=mock_bot)
+
+            assert result is True
+            assert mock_bot.send_message.call_count == 3
+            # Check exponential backoff delays: 2s, 4s
+            assert mock_sleep.call_count == 2
+            mock_sleep.assert_any_call(2)
+            mock_sleep.assert_any_call(4)
+
+    @pytest.mark.asyncio
+    async def test_send_message_with_retry_max_retries_exceeded(self, bot):
+        """Test failure after exceeding max retries."""
+        mock_bot = AsyncMock()
+        mock_bot.send_message = AsyncMock()
+
+        with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+            # Always fail with NetworkError
+            mock_bot.send_message.side_effect = NetworkError("Connection failed")
+
+            result = await bot._send_message_with_retry(12345, "Test message", max_retries=4, bot=mock_bot)
+
+            assert result is False
+            assert mock_bot.send_message.call_count == 5  # Initial attempt + 4 retries
+            # Check all exponential backoff delays: 2s, 4s, 8s, 16s
+            assert mock_sleep.call_count == 4
+            expected_delays = [2, 4, 8, 16]
+            actual_delays = [call[0][0] for call in mock_sleep.call_args_list]
+            assert actual_delays == expected_delays
+
+    @pytest.mark.asyncio
+    async def test_send_message_with_retry_forbidden_no_retry(self, bot):
+        """Test that Forbidden error doesn't trigger retry."""
+        mock_bot = AsyncMock()
+        mock_bot.send_message = AsyncMock()
+
+        with patch.object(bot.db_manager, 'mark_user_inactive_on_block') as mock_mark_inactive, \
+             patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+
+            mock_bot.send_message.side_effect = Forbidden("Bot was blocked")
+
+            result = await bot._send_message_with_retry(12345, "Test message", bot=mock_bot)
+
+            assert result is False
+            assert mock_bot.send_message.call_count == 1  # No retries
+            mock_sleep.assert_not_called()
+            mock_mark_inactive.assert_called_once_with(12345)
+
+    @pytest.mark.asyncio
+    async def test_send_message_with_retry_bad_request_no_retry(self, bot):
+        """Test that BadRequest error doesn't trigger retry."""
+        mock_bot = AsyncMock()
+        mock_bot.send_message = AsyncMock()
+
+        with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+            mock_bot.send_message.side_effect = BadRequest("Invalid message")
+
+            result = await bot._send_message_with_retry(12345, "Test message", bot=mock_bot)
+
+            assert result is False
+            assert mock_bot.send_message.call_count == 1  # No retries
+            mock_sleep.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_send_message_with_retry_generic_exception_no_retry(self, bot):
+        """Test that generic exceptions don't trigger retry."""
+        mock_bot = AsyncMock()
+        mock_bot.send_message = AsyncMock()
+
+        with patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+            mock_bot.send_message.side_effect = Exception("Unexpected error")
+
+            result = await bot._send_message_with_retry(12345, "Test message", bot=mock_bot)
+
+            assert result is False
+            assert mock_bot.send_message.call_count == 1  # No retries
+            mock_sleep.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_send_message_with_retry_custom_bot(self, bot):
+        """Test using custom bot instance."""
+        custom_bot = AsyncMock()
+        custom_bot.send_message = AsyncMock()
+
+        result = await bot._send_message_with_retry(
+            12345,
+            "Test message",
+            bot=custom_bot
+        )
+
+        assert result is True
+        custom_bot.send_message.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_send_immediate_notification_with_network_retry(self, bot, sample_post_data):
+        """Test that send_immediate_notification uses retry logic for network errors."""
+        mock_bot = AsyncMock()
+        mock_bot.send_message = AsyncMock()
+        bot.application.bot = mock_bot
+
+        with patch.object(bot.db_manager, 'get_active_users', return_value=[12345]), \
+             patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+
+            # Fail first attempt with network error, succeed on retry
+            mock_bot.send_message.side_effect = [NetworkError("Connection failed"), None]
+
+            await bot.send_immediate_notification(sample_post_data)
+
+            # Should have retried once
+            assert mock_bot.send_message.call_count == 2
+            # Check exponential backoff was used (2s for first retry)
+            assert any(call[0][0] == 2 for call in mock_sleep.call_args_list)
+
+    @pytest.mark.asyncio
+    async def test_send_reminder_job_with_network_retry(self, bot, sample_post_data):
+        """Test that _send_reminder_job uses retry logic for network errors."""
+        mock_context = Mock()
+        mock_context.job = Mock()
+        mock_context.job.data = sample_post_data
+        mock_context.bot = AsyncMock()
+        mock_context.bot.send_message = AsyncMock()
+
+        with patch.object(bot.db_manager, 'get_active_users', return_value=[12345]), \
+             patch('asyncio.sleep', new_callable=AsyncMock) as mock_sleep:
+
+            # Fail first attempt with timeout, succeed on retry
+            mock_context.bot.send_message.side_effect = [TimedOut("Timeout"), None]
+
+            await bot._send_reminder_job(mock_context)
+
+            # Should have retried once
+            assert mock_context.bot.send_message.call_count == 2
+            # Check exponential backoff was used (2s for first retry)
+            assert any(call[0][0] == 2 for call in mock_sleep.call_args_list)

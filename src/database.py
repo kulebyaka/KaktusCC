@@ -1,10 +1,9 @@
 from sqlalchemy import create_engine, Column, BigInteger, String, Text, Boolean, DateTime, Integer, text
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker, Session, declarative_base
 from sqlalchemy.sql import func
 from sqlalchemy.exc import OperationalError
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 import logging
 import time
 
@@ -139,28 +138,36 @@ class DatabaseManager:
             session.close()
     
     def is_post_processed(self, post_hash: str) -> bool:
-        """Check if post has already been processed."""
+        """Check if post has been processed AND notifications have been sent."""
         session = self.get_session()
         try:
-            exists = session.query(ProcessedPost).filter(ProcessedPost.post_hash == post_hash).first() is not None
-            return exists
+            post = session.query(ProcessedPost).filter(ProcessedPost.post_hash == post_hash).first()
+            # Consider processed only if notifications were successfully sent
+            return post is not None and post.notifications_sent
         except Exception as e:
             logger.error(f"Error checking processed post: {e}")
             return False
         finally:
             session.close()
     
-    def add_processed_post(self, post_hash: str, title: str, content: str, 
+    def add_processed_post(self, post_hash: str, title: str, content: str,
                           event_datetime: Optional[datetime] = None) -> bool:
-        """Add a processed post to database."""
+        """Add a processed post to database with notifications_sent=False.
+        Returns True if newly added, False if already exists."""
         session = self.get_session()
         try:
+            # Check if post already exists
+            existing = session.query(ProcessedPost).filter(ProcessedPost.post_hash == post_hash).first()
+            if existing:
+                logger.debug(f"Post already exists in database: {title}")
+                return False
+
             post = ProcessedPost(
                 post_hash=post_hash,
                 title=title,
                 content=content,
                 event_datetime=event_datetime,
-                notifications_sent=True
+                notifications_sent=False
             )
             session.add(post)
             session.commit()
@@ -172,7 +179,79 @@ class DatabaseManager:
             return False
         finally:
             session.close()
-    
+
+    def add_past_post(self, post_hash: str, title: str, content: str,
+                      event_datetime: Optional[datetime] = None) -> bool:
+        """Add a past event post to database with notifications_sent=True.
+        This is used during deployment to skip sending notifications for old events.
+
+        Returns True if newly added, False if already exists."""
+        session = self.get_session()
+        try:
+            # Check if post already exists
+            existing = session.query(ProcessedPost).filter(ProcessedPost.post_hash == post_hash).first()
+            if existing:
+                logger.debug(f"Past post already exists in database: {title}")
+                return False
+
+            post = ProcessedPost(
+                post_hash=post_hash,
+                title=title,
+                content=content,
+                event_datetime=event_datetime,
+                notifications_sent=True  # Mark as sent to skip notifications
+            )
+            session.add(post)
+            session.commit()
+            logger.info(f"Added past post (notifications skipped): {title}")
+            return True
+        except Exception as e:
+            logger.error(f"Error adding past post: {e}")
+            session.rollback()
+            return False
+        finally:
+            session.close()
+
+    def mark_notifications_sent(self, post_hash: str) -> bool:
+        """Mark notifications as sent for a processed post."""
+        session = self.get_session()
+        try:
+            post = session.query(ProcessedPost).filter(ProcessedPost.post_hash == post_hash).first()
+            if post:
+                post.notifications_sent = True
+                session.commit()
+                logger.info(f"Marked notifications as sent for post: {post.title}")
+                return True
+            else:
+                logger.warning(f"Post with hash {post_hash} not found")
+                return False
+        except Exception as e:
+            logger.error(f"Error marking notifications as sent: {e}")
+            session.rollback()
+            return False
+        finally:
+            session.close()
+
+    def get_unsent_posts(self) -> List[Dict]:
+        """Get all posts that haven't had notifications sent yet."""
+        session = self.get_session()
+        try:
+            posts = session.query(ProcessedPost).filter(ProcessedPost.notifications_sent == False).all()
+            result = []
+            for post in posts:
+                result.append({
+                    'post_hash': post.post_hash,
+                    'title': post.title,
+                    'content': post.content,
+                    'event_datetime': post.event_datetime
+                })
+            return result
+        except Exception as e:
+            logger.error(f"Error getting unsent posts: {e}")
+            return []
+        finally:
+            session.close()
+
     def mark_user_inactive_on_block(self, chat_id: int):
         """Mark user as inactive when bot is blocked."""
         self.deactivate_user(chat_id)

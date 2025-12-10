@@ -223,18 +223,21 @@ class TestScraperCheckForNewPosts:
         assert result is None
     
     def test_check_for_new_posts_database_add_failure(self, scraper, sample_html, mock_requests_get):
-        """Test checking when database add fails."""
+        """Test checking when post exists but notifications not sent (retry scenario)."""
         mock_response = Mock()
         mock_response.content = sample_html.encode()
         mock_response.raise_for_status.return_value = None
         mock_requests_get.return_value = mock_response
-        
+
         with patch.object(scraper.db_manager, 'is_post_processed', return_value=False), \
              patch.object(scraper.db_manager, 'add_processed_post', return_value=False):
-            
+
+            # When add_processed_post returns False (already exists),
+            # we still return post_data to allow notification retry
             result = scraper.check_for_new_posts()
-            
-            assert result is None
+
+            assert result is not None
+            assert 'post_hash' in result
 
 class TestScraperMonitoring:
     
