@@ -47,15 +47,16 @@ def calculate_post_hash(title: str, event_datetime: Optional[datetime] = None) -
     Returns:
         SHA256 hash of title and datetime
     """
-    # Use title as primary identifier
-    combined = title.strip()
-
-    # Add event datetime if available for additional uniqueness
+    # If we have an event datetime, use strictly that for unique identification
+    # This prevents minor text changes from triggering new notifications for the same event
     if event_datetime:
         # Use ISO format for consistent string representation
-        combined += event_datetime.isoformat()
+        unique_string = event_datetime.isoformat()
+    else:
+        # Fallback to title if no date is available (e.g. general info post)
+        unique_string = title.strip()
 
-    return hashlib.sha256(combined.encode('utf-8')).hexdigest()
+    return hashlib.sha256(unique_string.encode('utf-8')).hexdigest()
 
 def datetime_to_unix_timestamp(dt: datetime) -> int:
     """Convert datetime to Unix timestamp for Telegram API."""

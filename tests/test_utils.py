@@ -78,37 +78,42 @@ class TestParseCzechDatetime:
 
 class TestCalculatePostHash:
     
-    def test_calculate_post_hash_same_content(self):
-        """Test that same content produces same hash."""
+    def test_calculate_post_hash_same_inputs(self):
+        """Same title and datetime produce same hash."""
         title = "Test Title"
-        content = "Test Content"
+        tz = pytz.UTC
+        event_dt = tz.localize(datetime(2025, 9, 9, 15, 0))
         
-        hash1 = calculate_post_hash(title, content)
-        hash2 = calculate_post_hash(title, content)
+        hash1 = calculate_post_hash(title, event_dt)
+        hash2 = calculate_post_hash(title, event_dt)
         
         assert hash1 == hash2
         assert len(hash1) == 64
     
-    def test_calculate_post_hash_different_content(self):
-        """Test that different content produces different hash."""
-        hash1 = calculate_post_hash("Title 1", "Content 1")
-        hash2 = calculate_post_hash("Title 2", "Content 2")
+    def test_calculate_post_hash_different_datetime(self):
+        """Different datetimes produce different hash for same title."""
+        title = "Title"
+        tz = pytz.UTC
+        dt1 = tz.localize(datetime(2025, 1, 1, 12, 0))
+        dt2 = tz.localize(datetime(2025, 1, 1, 13, 0))
+        
+        hash1 = calculate_post_hash(title, dt1)
+        hash2 = calculate_post_hash(title, dt2)
         
         assert hash1 != hash2
     
-    def test_calculate_post_hash_strips_whitespace(self):
-        """Test that whitespace is stripped before hashing."""
-        hash1 = calculate_post_hash("  Title  ", "  Content  ")
-        hash2 = calculate_post_hash("Title", "Content")
+    def test_calculate_post_hash_strips_whitespace_in_title(self):
+        """Whitespace in title is stripped before hashing."""
+        hash1 = calculate_post_hash("  Title  ", None)
+        hash2 = calculate_post_hash("Title", None)
         
         assert hash1 == hash2
     
-    def test_calculate_post_hash_unicode_content(self):
-        """Test hashing with unicode content."""
+    def test_calculate_post_hash_unicode_title(self):
+        """Hashing works with unicode in title."""
         title = "Nabíjení 🔋"
-        content = "Speciální akce s emoji"
         
-        hash_result = calculate_post_hash(title, content)
+        hash_result = calculate_post_hash(title, None)
         
         assert len(hash_result) == 64
         assert isinstance(hash_result, str)
